@@ -12,7 +12,10 @@ export class BookmarkController {
   ) {}
 
   /** 启动收藏操作，并返回本次请求是否成功。 */
-  public async add(artwork: Artwork): Promise<boolean> {
+  public async add(
+    artwork: Artwork,
+    cardElement?: HTMLElement
+  ): Promise<boolean> {
     if (artwork.bookmarkData) {
       this.notification.show('这个作品已经收藏', 'info')
       return false
@@ -28,6 +31,7 @@ export class BookmarkController {
       await this.api.addBookmark(artwork)
       artwork.bookmarkData = { id: '', private: false }
       artwork.bookmarkCount++
+      this.updateBookmarkIcon(cardElement)
       this.notification.show('已收藏', 'success')
       return true
     } catch (error) {
@@ -36,6 +40,24 @@ export class BookmarkController {
     } finally {
       this.pending.delete(artwork.id)
     }
+  }
+
+  /** 复刻原扩展的视觉同步，不触发 Pixiv 原生收藏按钮。 */
+  private updateBookmarkIcon(cardElement?: HTMLElement): void {
+    if (!cardElement) return
+
+    const allSvg = cardElement.querySelectorAll<SVGSVGElement>('svg')
+    const bookmarkSvg =
+      cardElement.querySelector<SVGSVGElement>('button svg') ||
+      allSvg[allSvg.length - 1]
+    if (bookmarkSvg) {
+      bookmarkSvg.style.color = 'rgb(255, 64, 96)'
+      for (const path of bookmarkSvg.querySelectorAll('path')) {
+        path.style.fill = 'currentcolor'
+      }
+    }
+
+    cardElement.querySelector('._one-click-bookmark')?.classList.add('on')
   }
 
   /** 将常见 HTTP 状态转换成可操作的错误提示。 */

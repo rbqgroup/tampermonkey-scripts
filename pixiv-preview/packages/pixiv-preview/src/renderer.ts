@@ -1,21 +1,148 @@
 import type { Artwork } from './types'
 
+interface GMProgressEvent {
+  lengthComputable: boolean
+  loaded: number
+  total: number
+}
+
+interface GMResponse<T> {
+  response: T
+  status: number
+  statusText: string
+}
+
+interface GMRequestControl {
+  abort(): void
+}
+
+interface GMRequestOptions<T> {
+  method: 'GET'
+  url: string
+  headers?: Record<string, string>
+  responseType: 'blob'
+  onprogress(event: GMProgressEvent): void
+  onload(response: GMResponse<T>): void
+  onerror(response: GMResponse<T>): void
+  onabort(): void
+  ontimeout(): void
+}
+
+declare function GM_xmlhttpRequest<T>(
+  options: GMRequestOptions<T>
+): GMRequestControl
+
+/** 图片下载的真实字节进度。 */
+export interface LoadProgress {
+  loaded: number
+  total?: number
+}
+
+/** 已加载的预览资源及其释放方法。 */
+export interface RenderedArtwork {
+  image: HTMLImageElement
+  dispose(): void
+}
+
 /** 作品预览渲染器，为后续动图渲染保留稳定边界。 */
 export interface ArtworkRenderer {
-  load(artwork: Artwork, index: number): Promise<HTMLImageElement>
+  load(
+    artwork: Artwork,
+    index: number,
+    signal: AbortSignal,
+    onProgress: (progress: LoadProgress) => void
+  ): Promise<RenderedArtwork>
   getUrl(artwork: Artwork, index: number): string
 }
 
-/** 渲染单图、漫画和动图封面。 */
+/** 通过 Tampermonkey 跨域请求下载并渲染静态图片。 */
 export class StaticArtworkRenderer implements ArtworkRenderer {
-  /** 加载指定页并返回具有真实尺寸的图片元素。 */
-  public load(artwork: Artwork, index: number): Promise<HTMLImageElement> {
+  /** 下载指定页并返回可主动释放的 Blob 图片。 */
+  public load(
+    artwork: Artwork,
+    index: number,
+    signal: AbortSignal,
+    onProgress: (progress: LoadProgress) => void
+  ): Promise<RenderedArtwork> {
     return new Promise((resolve, reject) => {
-      const image = new Image()
-      image.alt = artwork.title
-      image.onload = () => resolve(image)
-      image.onerror = () => reject(new Error('预览图片加载失败'))
-      image.src = this.getUrl(artwork, index)
+      let request: GMRequestControl | undefined
+      let objectUrl = ''
+      let settled = false
+
+      const cleanup = () => signal.removeEventListener('abort', abort)
+      const fail = (error: Error) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        if (objectUrl) URL.revokeObjectURL(objectUrl)
+        reject(error)
+      }
+      const abort = () => {
+        request?.abort()
+        fail(new DOMException('预览已取消', 'AbortError'))
+      }
+
+      signal.addEventListener('abort', abort, { once: true })
+      request = GM_xmlhttpRequest<Blob>({
+        method: 'GET',
+        url: this.getUrl(artwork, index),
+        headers: { Referer: 'https://www.pixiv.net/' },
+        responseType: 'blob',
+        onprogress: (event) => {
+          if (settled) return
+          onProgress({
+            loaded: event.loaded,
+            total:
+              event.lengthComputable && event.total > 0
+                ? event.total
+                : undefined,
+          })
+        },
+        onload: (response) => {
+          if (signal.aborted) return abort()
+          if (response.status < 200 || response.status >= 300) {
+            fail(
+              new Error(
+                `预览图片请求失败: HTTP ${response.status} ${response.statusText}`
+              )
+            )
+            return
+          }
+
+          onProgress({
+            loaded: response.response.size,
+            total: response.response.size,
+          })
+          objectUrl = URL.createObjectURL(response.response)
+          const image = new Image()
+          image.alt = artwork.title
+          image.onload = () => {
+            if (signal.aborted) return abort()
+            settled = true
+            cleanup()
+            resolve({
+              image,
+              dispose: () => {
+                image.src = ''
+                URL.revokeObjectURL(objectUrl)
+              },
+            })
+          }
+          image.onerror = () => fail(new Error('预览图片解码失败'))
+          image.src = objectUrl
+        },
+        onerror: (response) => {
+          fail(
+            new Error(
+              `预览图片请求失败: HTTP ${response.status} ${response.statusText}`
+            )
+          )
+        },
+        onabort: () => fail(new DOMException('预览已取消', 'AbortError')),
+        ontimeout: () => fail(new Error('预览图片请求超时')),
+      })
+
+      if (signal.aborted) abort()
     })
   }
 

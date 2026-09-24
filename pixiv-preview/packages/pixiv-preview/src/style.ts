@@ -13,6 +13,9 @@ export const style = `
   pointer-events: none;
 }
 .ppv-preview-visible { display: block; }
+.ppv-preview-loading { background: rgba(24, 24, 24, .94); }
+.ppv-preview-loading .ppv-preview-info { display: none; }
+.ppv-preview-ready .ppv-preview-loading-panel { display: none; }
 .ppv-preview-info {
   box-sizing: border-box;
   display: flex;
@@ -35,6 +38,44 @@ export const style = `
 }
 .ppv-preview-info .ppv-preview-title { flex-shrink: 1; }
 .ppv-preview img { display: block; width: 100%; height: auto; }
+.ppv-preview-loading-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  min-height: 68px;
+  padding: 12px;
+  color: #fff;
+  font: 13px/1.4 Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+.ppv-preview-loading-text {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ppv-preview-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .25);
+}
+.ppv-preview-progress-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #29b6f6;
+  transition: width .12s linear;
+}
+.ppv-preview-progress-bar-indeterminate {
+  width: 35%;
+  animation: ppv-progress 1s ease-in-out infinite;
+}
+@keyframes ppv-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(300%); }
+}
 .ppv-toast-container {
   position: fixed;
   z-index: 2147483647;

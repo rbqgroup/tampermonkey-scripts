@@ -40,4 +40,5 @@ export interface PixivResponse<T> {
 export interface ArtworkTarget {
   id: string
   element: HTMLAnchorElement
+  cardElement?: HTMLElement
 }

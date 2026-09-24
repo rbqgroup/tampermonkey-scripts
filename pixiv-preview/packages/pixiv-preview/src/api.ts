@@ -16,12 +16,14 @@ export class PixivApi {
   private csrfToken = ''
 
   /** 获取作品数据；失败的请求不会写入缓存。 */
-  public async getArtwork(id: string): Promise<Artwork> {
+  public async getArtwork(id: string, signal?: AbortSignal): Promise<Artwork> {
+    signal?.throwIfAborted()
     const cached = this.artworkCache.get(id)
     if (cached) return cached
 
     const data = await this.request<PixivResponse<Artwork>>(
-      `/ajax/illust/${id}?time=${Date.now()}`
+      `/ajax/illust/${id}?time=${Date.now()}`,
+      { signal }
     )
     if (data.error || !data.body) {
       throw new PixivApiError(data.message || '获取作品数据失败', 200)

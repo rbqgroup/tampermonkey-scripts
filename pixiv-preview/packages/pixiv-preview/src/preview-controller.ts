@@ -2,7 +2,11 @@ import { ArtworkLocator } from './artwork-locator'
 import { BookmarkController } from './bookmark-controller'
 import { PixivApi, PixivApiError } from './api'
 import { Notification } from './notification'
-import type { ArtworkRenderer } from './renderer'
+import type {
+  ArtworkRenderer,
+  LoadProgress,
+  RenderedArtwork,
+} from './renderer'
 import type { Artwork, ArtworkTarget } from './types'
 
 const SHOW_DELAY = 400
@@ -15,9 +19,15 @@ const PREVIEW_GAP = 6
 export class PreviewController {
   private readonly wrap = document.createElement('div')
   private readonly info = document.createElement('div')
+  private readonly loadingPanel = document.createElement('div')
+  private readonly loadingText = document.createElement('div')
+  private readonly progressTrack = document.createElement('div')
+  private readonly progressBar = document.createElement('div')
   private readonly locator = new ArtworkLocator()
   private activeTarget?: ArtworkTarget
   private artwork?: Artwork
+  private activeRequest?: AbortController
+  private renderedArtwork?: RenderedArtwork
   private index = 0
   private showTimer?: number
   private version = 0
@@ -37,7 +47,14 @@ export class PreviewController {
   ) {
     this.wrap.className = 'ppv-preview'
     this.info.className = 'ppv-preview-info'
-    this.wrap.append(this.info)
+    this.loadingPanel.className = 'ppv-preview-loading-panel'
+    this.loadingText.className = 'ppv-preview-loading-text'
+    this.progressTrack.className = 'ppv-preview-progress-track'
+    this.progressBar.className =
+      'ppv-preview-progress-bar ppv-preview-progress-bar-indeterminate'
+    this.progressTrack.append(this.progressBar)
+    this.loadingPanel.append(this.loadingText, this.progressTrack)
+    this.wrap.append(this.info, this.loadingPanel)
     document.body.append(this.wrap)
     this.bindEvents()
   }
@@ -89,45 +106,86 @@ export class PreviewController {
 
   /** 加载作品与第一页，并在确认请求仍有效后显示。 */
   private async show(target: ArtworkTarget, version: number): Promise<void> {
+    const request = this.startRequest()
+    this.showLoading(target.element, '正在获取作品信息')
     try {
-      const artwork = await this.api.getArtwork(target.id)
+      const artwork = await this.api.getArtwork(target.id, request.signal)
       if (!this.isCurrent(target, version)) return
 
       this.artwork = artwork
       this.index = 0
-      await this.render(version)
+      this.showLoading(target.element, '正在连接图片资源')
+      await this.render(version, request.signal)
     } catch (error) {
-      if (this.isCurrent(target, version)) {
-        const message =
-          error instanceof PixivApiError && error.status === 429
-            ? '预览请求过于频繁，请稍后再试'
-            : '预览加载失败，请稍后重试'
-        this.notification.show(message, 'error')
-        this.hide()
-      }
-      console.error('[Pixiv Preview]', error)
+      this.handlePreviewError(error, target, version)
     }
   }
 
   /** 加载当前页图片并原子替换预览内容。 */
-  private async render(version: number): Promise<void> {
+  private async render(version: number, signal: AbortSignal): Promise<void> {
     const artwork = this.artwork
     const target = this.activeTarget
     if (!artwork || !target) return
 
     const index = this.index
-    const image = await this.renderer.load(artwork, index)
+    const rendered = await this.renderer.load(
+      artwork,
+      index,
+      signal,
+      (progress) => {
+        if (this.isCurrent(target, version) && this.index === index) {
+          this.updateLoadingProgress(progress)
+        }
+      }
+    )
     if (!this.isCurrent(target, version) || this.index !== index) {
-      image.src = ''
+      rendered.dispose()
       return
     }
 
+    this.renderedArtwork = rendered
+    const image = rendered.image
     this.wrap.querySelector('img')?.remove()
     this.updateInfo(artwork, image)
     this.sizeAndPosition(image, target.element)
     this.wrap.append(image)
-    this.wrap.classList.add('ppv-preview-visible')
-    this.preloadNext(artwork, index)
+    this.wrap.classList.remove('ppv-preview-loading')
+    this.wrap.classList.add('ppv-preview-visible', 'ppv-preview-ready')
+  }
+
+  /** 显示小型加载窗口，并重置为等待网络响应的状态。 */
+  private showLoading(element: HTMLElement, message: string): void {
+    this.loadingText.textContent = message
+    this.progressBar.style.width = ''
+    this.progressBar.classList.add('ppv-preview-progress-bar-indeterminate')
+    this.positionWrap(element, 220, 68)
+    this.wrap.classList.remove('ppv-preview-ready')
+    this.wrap.classList.add('ppv-preview-visible', 'ppv-preview-loading')
+  }
+
+  /** 使用 Tampermonkey 提供的真实下载字节更新进度。 */
+  private updateLoadingProgress(progress: LoadProgress): void {
+    if (progress.total) {
+      const percent = Math.min(
+        100,
+        Math.round((progress.loaded / progress.total) * 100)
+      )
+      this.loadingText.textContent = `${this.formatBytes(progress.loaded)} / ${this.formatBytes(progress.total)} (${percent}%)`
+      this.progressBar.classList.remove(
+        'ppv-preview-progress-bar-indeterminate'
+      )
+      this.progressBar.style.width = `${percent}%`
+      return
+    }
+
+    this.loadingText.textContent = `已加载 ${this.formatBytes(progress.loaded)}`
+  }
+
+  /** 将字节数格式化成适合加载窗口显示的短文本。 */
+  private formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   }
 
   /** 更新顶部摘要信息。 */
@@ -164,19 +222,40 @@ export class PreviewController {
     )
     const width = Math.max(1, Math.floor(image.naturalWidth * scale))
     const height = Math.max(1, Math.floor(image.naturalHeight * scale))
-    const left = placeLeft
+    this.positionWrap(element, width, height + INFO_HEIGHT, placeLeft)
+    image.style.height = `${height}px`
+  }
+
+  /** 把加载窗口或图片预览放到缩略图空间较大的一侧。 */
+  private positionWrap(
+    element: HTMLElement,
+    requestedWidth: number,
+    height: number,
+    preferredLeft?: boolean
+  ): void {
+    const rect = element.getBoundingClientRect()
+    const leftSpace = rect.left - PREVIEW_GAP - VIEWPORT_MARGIN
+    const rightSpace =
+      window.innerWidth - rect.right - PREVIEW_GAP - VIEWPORT_MARGIN
+    const placeLeft = preferredLeft ?? leftSpace >= rightSpace
+    const availableWidth = Math.max(1, placeLeft ? leftSpace : rightSpace)
+    const width = Math.min(requestedWidth, Math.max(120, availableWidth))
+    const rawLeft = placeLeft
       ? rect.left - PREVIEW_GAP - width
       : rect.right + PREVIEW_GAP
-    const centeredTop = rect.top + rect.height / 2 - (height + INFO_HEIGHT) / 2
+    const left = Math.min(
+      Math.max(VIEWPORT_MARGIN, rawLeft),
+      window.innerWidth - width - VIEWPORT_MARGIN
+    )
+    const centeredTop = rect.top + rect.height / 2 - height / 2
     const top = Math.min(
       Math.max(VIEWPORT_MARGIN, centeredTop),
-      window.innerHeight - height - INFO_HEIGHT - VIEWPORT_MARGIN
+      window.innerHeight - height - VIEWPORT_MARGIN
     )
 
-    this.wrap.style.width = `${width}px`
+    this.wrap.style.width = `${Math.round(width)}px`
     this.wrap.style.left = `${Math.round(left)}px`
     this.wrap.style.top = `${Math.round(top)}px`
-    image.style.height = `${height}px`
   }
 
   /** 在当前缩略图上滚动时循环切换多图页码。 */
@@ -200,8 +279,12 @@ export class PreviewController {
 
     const count = this.artwork.pageCount
     this.index = (this.index + (event.deltaY < 0 ? -1 : 1) + count) % count
-    void this.render(++this.version).catch((error) => {
-      console.error('[Pixiv Preview]', error)
+    const target = this.activeTarget
+    const version = ++this.version
+    const request = this.startRequest()
+    this.showLoading(target.element, '正在连接图片资源')
+    void this.render(version, request.signal).catch((error) => {
+      this.handlePreviewError(error, target, version)
     })
   }
 
@@ -231,7 +314,8 @@ export class PreviewController {
     const activeElement = document.activeElement
     if (activeElement instanceof HTMLElement) activeElement.blur()
     const artwork = this.artwork
-    void this.bookmarkController.add(artwork).then((success) => {
+    const cardElement = this.activeTarget?.cardElement
+    void this.bookmarkController.add(artwork, cardElement).then((success) => {
       const image = this.wrap.querySelector('img')
       if (success && this.artwork === artwork && image) {
         this.updateInfo(artwork, image)
@@ -239,11 +323,33 @@ export class PreviewController {
     })
   }
 
-  /** 预加载下一页，失败不会影响当前预览。 */
-  private preloadNext(artwork: Artwork, index: number): void {
-    if (index + 1 >= artwork.pageCount) return
-    const image = new Image()
-    image.src = this.renderer.getUrl(artwork, index + 1)
+  /** 终止旧任务并创建只属于当前预览请求的取消信号。 */
+  private startRequest(): AbortController {
+    this.activeRequest?.abort()
+    this.renderedArtwork?.dispose()
+    this.renderedArtwork = undefined
+    this.wrap.querySelector('img')?.remove()
+    const request = new AbortController()
+    this.activeRequest = request
+    return request
+  }
+
+  /** 忽略主动取消，只向当前预览报告真实请求错误。 */
+  private handlePreviewError(
+    error: unknown,
+    target: ArtworkTarget,
+    version: number
+  ): void {
+    if (error instanceof DOMException && error.name === 'AbortError') return
+    if (this.isCurrent(target, version)) {
+      const message =
+        error instanceof PixivApiError && error.status === 429
+          ? '预览请求过于频繁，请稍后再试'
+          : '预览加载失败，请稍后重试'
+      this.notification.show(message, 'error')
+      this.hide()
+    }
+    console.error('[Pixiv Preview]', error)
   }
 
   /** 检查异步结果是否仍属于当前悬浮目标。 */
@@ -254,13 +360,19 @@ export class PreviewController {
   /** 清理所有可见状态并使旧异步任务失效。 */
   private hide = (): void => {
     window.clearTimeout(this.showTimer)
+    this.activeRequest?.abort()
+    this.activeRequest = undefined
+    this.renderedArtwork?.dispose()
+    this.renderedArtwork = undefined
     this.version++
     this.activeTarget = undefined
     this.artwork = undefined
     this.index = 0
-    this.wrap.classList.remove('ppv-preview-visible')
-    const image = this.wrap.querySelector('img')
-    if (image) image.src = ''
-    image?.remove()
+    this.wrap.classList.remove(
+      'ppv-preview-visible',
+      'ppv-preview-loading',
+      'ppv-preview-ready'
+    )
+    this.wrap.querySelector('img')?.remove()
   }
 }
