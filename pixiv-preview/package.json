@@ -1,0 +1,11 @@
+{
+  "name": "pixiv-preview-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=pixiv-preview",
+    "typecheck": "npm run typecheck --workspace=pixiv-preview"
+  }
+}
