@@ -1,5 +1,6 @@
 import { PixivApi } from './api'
 import { BookmarkController } from './bookmark-controller'
+import { BrowserImageCache } from './browser-image-cache'
 import { Notification } from './notification'
 import { PreviewController } from './preview-controller'
 import { StaticArtworkRenderer } from './renderer'
@@ -11,9 +12,10 @@ function bootstrap(): void {
   const api = new PixivApi()
   const notification = new Notification()
   const bookmarkController = new BookmarkController(api, notification)
+  const imageCache = new BrowserImageCache(3)
   new PreviewController(
     api,
-    new StaticArtworkRenderer(),
+    new StaticArtworkRenderer(imageCache),
     bookmarkController,
     notification
   )

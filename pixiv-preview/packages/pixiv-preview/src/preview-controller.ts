@@ -151,6 +151,7 @@ export class PreviewController {
     this.wrap.append(image)
     this.wrap.classList.remove('ppv-preview-loading')
     this.wrap.classList.add('ppv-preview-visible', 'ppv-preview-ready')
+    void this.renderer.preload(artwork, index, signal)
   }
 
   /** 显示小型加载窗口，并重置为等待网络响应的状态。 */

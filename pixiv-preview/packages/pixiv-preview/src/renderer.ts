@@ -1,3 +1,4 @@
+import { BrowserImageCache } from './browser-image-cache'
 import type { Artwork } from './types'
 
 interface GMProgressEvent {
@@ -52,13 +53,56 @@ export interface ArtworkRenderer {
     signal: AbortSignal,
     onProgress: (progress: LoadProgress) => void
   ): Promise<RenderedArtwork>
+  preload(
+    artwork: Artwork,
+    currentIndex: number,
+    signal: AbortSignal
+  ): Promise<void>
   getUrl(artwork: Artwork, index: number): string
 }
 
 /** 通过 Tampermonkey 跨域请求下载并渲染静态图片。 */
 export class StaticArtworkRenderer implements ArtworkRenderer {
+  constructor(private readonly cache: BrowserImageCache) {}
+
   /** 下载指定页并返回可主动释放的 Blob 图片。 */
-  public load(
+  public async load(
+    artwork: Artwork,
+    index: number,
+    signal: AbortSignal,
+    onProgress: (progress: LoadProgress) => void
+  ): Promise<RenderedArtwork> {
+    const cachedImage = await this.cache.createImage(
+      artwork.id,
+      index,
+      signal
+    )
+    if (cachedImage) {
+      onProgress({ loaded: 1, total: 1 })
+      return {
+        image: cachedImage,
+        dispose: () => {
+          cachedImage.src = ''
+        },
+      }
+    }
+
+    return this.download(artwork, index, signal, onProgress)
+  }
+
+  /** 顺序预加载作品的所有图片到浏览器缓存。 */
+  public preload(
+    artwork: Artwork,
+    currentIndex: number,
+    signal: AbortSignal
+  ): Promise<void> {
+    return this.cache.preload(artwork, currentIndex, signal, (index) =>
+      this.getUrl(artwork, index)
+    )
+  }
+
+  /** 使用 GM 请求下载未命中的图片并报告真实进度。 */
+  private download(
     artwork: Artwork,
     index: number,
     signal: AbortSignal,
