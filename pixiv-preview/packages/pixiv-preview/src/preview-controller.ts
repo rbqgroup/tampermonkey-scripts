@@ -2,6 +2,7 @@ import { ArtworkLocator } from './artwork-locator'
 import { BookmarkController } from './bookmark-controller'
 import { PixivApi, PixivApiError } from './api'
 import { Notification } from './notification'
+import { SettingsStore } from './settings'
 import type {
   ArtworkRenderer,
   LoadProgress,
@@ -9,7 +10,6 @@ import type {
 } from './renderer'
 import type { Artwork, ArtworkTarget } from './types'
 
-const SHOW_DELAY = 400
 const WHEEL_THROTTLE = 100
 const INFO_HEIGHT = 25
 const VIEWPORT_MARGIN = 8
@@ -43,7 +43,8 @@ export class PreviewController {
     private readonly api: PixivApi,
     private readonly renderer: ArtworkRenderer,
     private readonly bookmarkController: BookmarkController,
-    private readonly notification: Notification
+    private readonly notification: Notification,
+    private readonly settings: SettingsStore
   ) {
     this.wrap.className = 'ppv-preview'
     this.info.className = 'ppv-preview-info'
@@ -86,7 +87,7 @@ export class PreviewController {
     const version = ++this.version
     this.showTimer = window.setTimeout(() => {
       void this.show(target, version)
-    }, SHOW_DELAY)
+    }, this.settings.value.showDelay)
   }
 
   /** 真正离开当前作品链接时关闭预览。 */
@@ -151,7 +152,7 @@ export class PreviewController {
     this.wrap.append(image)
     this.wrap.classList.remove('ppv-preview-loading')
     this.wrap.classList.add('ppv-preview-visible', 'ppv-preview-ready')
-    void this.renderer.preload(artwork, index, signal)
+    void this.renderer.preload(artwork, index)
   }
 
   /** 显示小型加载窗口，并重置为等待网络响应的状态。 */
@@ -362,6 +363,7 @@ export class PreviewController {
   private hide = (): void => {
     window.clearTimeout(this.showTimer)
     this.activeRequest?.abort()
+    this.renderer.cancelPreload()
     this.activeRequest = undefined
     this.renderedArtwork?.dispose()
     this.renderedArtwork = undefined

@@ -101,6 +101,96 @@ export const style = `
 .ppv-toast-success { background: #00a878; }
 .ppv-toast-error { background: #d64242; }
 .ppv-toast-leave { opacity: 0; transform: translateY(-6px); }
+.ppv-settings-backdrop {
+  position: fixed;
+  z-index: 2147483647;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .55);
+  font-family: Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+.ppv-settings-backdrop.is-open { display: flex; }
+.ppv-settings-panel {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid #4a4a4a;
+  border-radius: 10px;
+  color: #f4f4f4;
+  background: #242424;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, .45);
+}
+.ppv-settings-form { display: contents; }
+.ppv-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid #3d3d3d;
+  font-size: 17px;
+}
+.ppv-settings-close {
+  padding: 2px 8px;
+  border: 0;
+  color: #bbb;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ppv-settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+.ppv-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #ddd;
+  font-size: 14px;
+}
+.ppv-settings-checkbox-row { justify-content: flex-start; }
+.ppv-settings-row input[type="number"],
+.ppv-settings-row select {
+  box-sizing: border-box;
+  width: 150px;
+  padding: 7px 9px;
+  border: 1px solid #555;
+  border-radius: 5px;
+  color: #fff;
+  background: #181818;
+  font: inherit;
+}
+.ppv-settings-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #0096fa;
+}
+.ppv-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid #3d3d3d;
+}
+.ppv-settings-actions button {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 5px;
+  color: #eee;
+  background: #484848;
+  font: 14px/1.2 inherit;
+  cursor: pointer;
+}
+.ppv-settings-actions .ppv-settings-save {
+  color: #fff;
+  background: #0096fa;
+}
 `
 
 /** 将预览样式写入当前页面。 */

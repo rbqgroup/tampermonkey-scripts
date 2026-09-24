@@ -22,6 +22,7 @@ export interface Artwork {
   title: string
   urls: {
     regular: string
+    original: string
   }
   tags: {
     tags: ArtworkTag[]

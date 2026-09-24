@@ -1,4 +1,6 @@
 import { BrowserImageCache } from './browser-image-cache'
+import { getImageUrl } from './image-url'
+import { SettingsStore } from './settings'
 import type { Artwork } from './types'
 
 interface GMProgressEvent {
@@ -55,15 +57,18 @@ export interface ArtworkRenderer {
   ): Promise<RenderedArtwork>
   preload(
     artwork: Artwork,
-    currentIndex: number,
-    signal: AbortSignal
+    currentIndex: number
   ): Promise<void>
+  cancelPreload(): void
   getUrl(artwork: Artwork, index: number): string
 }
 
 /** 通过 Tampermonkey 跨域请求下载并渲染静态图片。 */
 export class StaticArtworkRenderer implements ArtworkRenderer {
-  constructor(private readonly cache: BrowserImageCache) {}
+  constructor(
+    private readonly cache: BrowserImageCache,
+    private readonly settings: SettingsStore
+  ) {}
 
   /** 下载指定页并返回可主动释放的 Blob 图片。 */
   public async load(
@@ -90,15 +95,23 @@ export class StaticArtworkRenderer implements ArtworkRenderer {
     return this.download(artwork, index, signal, onProgress)
   }
 
-  /** 顺序预加载作品的所有图片到浏览器缓存。 */
+  /** 并发预加载作品的所有图片到浏览器缓存。 */
   public preload(
     artwork: Artwork,
-    currentIndex: number,
-    signal: AbortSignal
+    currentIndex: number
   ): Promise<void> {
-    return this.cache.preload(artwork, currentIndex, signal, (index) =>
-      this.getUrl(artwork, index)
+    if (!this.settings.value.preloadEnabled) return Promise.resolve()
+    return this.cache.preload(
+      artwork,
+      currentIndex,
+      (index) => this.getUrl(artwork, index),
+      this.settings.value.preloadWorkers
     )
+  }
+
+  /** 取消当前作品的后台预加载。 */
+  public cancelPreload(): void {
+    this.cache.cancelPreload()
   }
 
   /** 使用 GM 请求下载未命中的图片并报告真实进度。 */
@@ -190,8 +203,8 @@ export class StaticArtworkRenderer implements ArtworkRenderer {
     })
   }
 
-  /** 由第一页 regular 地址生成指定页地址。 */
+  /** 由当前清晰度的第一页地址生成指定页地址。 */
   public getUrl(artwork: Artwork, index: number): string {
-    return artwork.urls.regular.replace(/_p0(?=[_.])/, `_p${index}`)
+    return getImageUrl(artwork, index, this.settings.value.imageQuality)
   }
 }
