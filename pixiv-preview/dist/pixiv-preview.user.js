@@ -569,7 +569,7 @@
     bindEvents() {
       document.addEventListener("pointerover", this.onPointerOver, true);
       document.addEventListener("pointerout", this.onPointerOut, true);
-      window.addEventListener("wheel", this.onWheel, {
+      document.addEventListener("wheel", this.onWheel, {
         capture: true,
         passive: false
       });
@@ -740,17 +740,18 @@
       this.wrap.style.left = `${Math.round(left)}px`;
       this.wrap.style.top = `${Math.round(top)}px`;
     }
-    /** 在当前缩略图上滚动时循环切换多图页码。 */
+    /** 在缩略图上滚动时阻止页面滚动，多图时循环切换页码。 */
     onWheel = (event) => {
-      if (!this.artwork || !this.activeTarget || this.artwork.pageCount <= 1 || !this.wrap.classList.contains("ppv-preview-visible") || !(event.target instanceof Node) || !this.activeTarget.element.contains(event.target)) {
+      if (!this.artwork || !this.activeTarget || !this.wrap.classList.contains("ppv-preview-visible") || !(event.target instanceof Node) || !this.activeTarget.element.contains(event.target)) {
         return;
       }
       event.preventDefault();
       event.stopPropagation();
+      const count = this.artwork.pageCount;
+      if (count <= 1) return;
       const now = performance.now();
       if (now - this.lastWheelTime < WHEEL_THROTTLE) return;
       this.lastWheelTime = now;
-      const count = this.artwork.pageCount;
       this.index = (this.index + (event.deltaY < 0 ? -1 : 1) + count) % count;
       const target = this.activeTarget;
       const version = ++this.version;
