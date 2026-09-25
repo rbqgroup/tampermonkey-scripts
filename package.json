@@ -1,0 +1,12 @@
+{
+  "name": "tampermonkey-scripts",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "pixiv-preview"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=pixiv-preview",
+    "typecheck": "npm run typecheck --workspace=pixiv-preview"
+  }
+}

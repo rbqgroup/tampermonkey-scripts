@@ -1,12 +1,19 @@
 {
-  "name": "pixiv-preview-workspace",
+  "name": "pixiv-preview",
+  "version": "0.6.0",
   "private": true,
   "license": "MIT",
-  "workspaces": [
-    "packages/*"
-  ],
+  "type": "module",
   "scripts": {
-    "build": "npm run build --workspace=pixiv-preview",
-    "typecheck": "npm run typecheck --workspace=pixiv-preview"
+    "build": "node build.mjs",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "^2.18.2"
   }
 }
