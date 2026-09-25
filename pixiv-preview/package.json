@@ -1,6 +1,7 @@
 {
   "name": "pixiv-preview-workspace",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "packages/*"
   ],
