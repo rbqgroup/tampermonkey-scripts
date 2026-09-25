@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pixiv Preview
 // @namespace    https://github.com/KagurazakaIris/tampermonkey-scripts
-// @version      0.4.0
+// @version      0.4.1
 // @description  悬浮预览 Pixiv 作品，并可通过滚轮切图和 B 键收藏
 // @match        https://www.pixiv.net/*
 // @run-at       document-idle
