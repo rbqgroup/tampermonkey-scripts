@@ -1,4 +1,4 @@
-import type { Artwork, PixivResponse } from './types'
+import type { Artwork, PixivResponse, UgoiraMetadata } from './types'
 
 /** 带 HTTP 状态码的 Pixiv 请求错误。 */
 export class PixivApiError extends Error {
@@ -42,6 +42,21 @@ export class PixivApi {
       return cached
     }
     this.artworkCache.set(id, data.body)
+    return data.body
+  }
+
+  /** 获取 Ugoira 压缩包地址和逐帧延迟。 */
+  public async getUgoiraMetadata(
+    id: string,
+    signal?: AbortSignal
+  ): Promise<UgoiraMetadata> {
+    const data = await this.request<PixivResponse<UgoiraMetadata>>(
+      `/ajax/illust/${id}/ugoira_meta`,
+      { signal }
+    )
+    if (data.error || !data.body) {
+      throw new PixivApiError(data.message || '获取动图数据失败', 200)
+    }
     return data.body
   }
 

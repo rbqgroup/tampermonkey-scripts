@@ -37,7 +37,7 @@ export const style = `
   text-overflow: ellipsis;
 }
 .ppv-preview-info .ppv-preview-title { flex-shrink: 1; }
-.ppv-preview img { display: block; width: 100%; height: auto; }
+.ppv-preview-media { display: block; width: 100%; height: auto; }
 .ppv-preview-loading-panel {
   box-sizing: border-box;
   display: flex;

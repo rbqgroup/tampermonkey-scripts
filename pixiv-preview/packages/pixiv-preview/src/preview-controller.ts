@@ -148,11 +148,12 @@ export class PreviewController {
     }
 
     this.renderedArtwork = rendered
-    const image = rendered.image
-    this.wrap.querySelector('img')?.remove()
-    this.updateInfo(artwork, image)
-    this.sizeAndPosition(image, target.element)
-    this.wrap.append(image)
+    const media = rendered.element
+    media.className = 'ppv-preview-media'
+    this.wrap.querySelector('.ppv-preview-media')?.remove()
+    this.updateInfo(artwork, rendered.width, rendered.height)
+    this.sizeAndPosition(media, rendered.width, rendered.height, target.element)
+    this.wrap.append(media)
     this.wrap.classList.remove('ppv-preview-loading')
     this.wrap.classList.add('ppv-preview-visible', 'ppv-preview-ready')
     void this.renderer.preload(artwork, index)
@@ -194,12 +195,12 @@ export class PreviewController {
   }
 
   /** 更新顶部摘要信息。 */
-  private updateInfo(artwork: Artwork, image: HTMLImageElement): void {
+  private updateInfo(artwork: Artwork, width: number, height: number): void {
     this.info.replaceChildren()
     const values = [
       artwork.pageCount > 1 ? `${this.index + 1}/${artwork.pageCount}` : '',
       `收藏 ${artwork.bookmarkCount}`,
-      `${image.naturalWidth}×${image.naturalHeight}`,
+      `${width}×${height}`,
       artwork.title,
     ]
     values.forEach((value, index) => {
@@ -212,7 +213,12 @@ export class PreviewController {
   }
 
   /** 按真实图片比例缩放，并放到缩略图空间较大的一侧。 */
-  private sizeAndPosition(image: HTMLImageElement, element: HTMLElement): void {
+  private sizeAndPosition(
+    media: HTMLElement,
+    mediaWidth: number,
+    mediaHeight: number,
+    element: HTMLElement
+  ): void {
     const rect = element.getBoundingClientRect()
     const leftSpace = rect.left - PREVIEW_GAP - VIEWPORT_MARGIN
     const rightSpace =
@@ -222,13 +228,13 @@ export class PreviewController {
     const availableHeight = window.innerHeight - VIEWPORT_MARGIN * 2 - INFO_HEIGHT
     const scale = Math.min(
       1,
-      availableWidth / image.naturalWidth,
-      availableHeight / image.naturalHeight
+      availableWidth / mediaWidth,
+      availableHeight / mediaHeight
     )
-    const width = Math.max(1, Math.floor(image.naturalWidth * scale))
-    const height = Math.max(1, Math.floor(image.naturalHeight * scale))
+    const width = Math.max(1, Math.floor(mediaWidth * scale))
+    const height = Math.max(1, Math.floor(mediaHeight * scale))
     this.positionWrap(element, width, height + INFO_HEIGHT, placeLeft)
-    image.style.height = `${height}px`
+    media.style.height = `${height}px`
   }
 
   /** 把加载窗口或图片预览放到缩略图空间较大的一侧。 */
@@ -325,9 +331,9 @@ export class PreviewController {
         ? this.bookmarkController.add(artwork, cardElement)
         : this.bookmarkController.remove(artwork, cardElement)
     void operation.then(() => {
-      const image = this.wrap.querySelector('img')
-      if (this.artwork === artwork && image) {
-        this.updateInfo(artwork, image)
+      const rendered = this.renderedArtwork
+      if (this.artwork === artwork && rendered) {
+        this.updateInfo(artwork, rendered.width, rendered.height)
       }
     })
   }
@@ -337,7 +343,7 @@ export class PreviewController {
     this.activeRequest?.abort()
     this.renderedArtwork?.dispose()
     this.renderedArtwork = undefined
-    this.wrap.querySelector('img')?.remove()
+    this.wrap.querySelector('.ppv-preview-media')?.remove()
     const request = new AbortController()
     this.activeRequest = request
     return request
@@ -383,6 +389,6 @@ export class PreviewController {
       'ppv-preview-loading',
       'ppv-preview-ready'
     )
-    this.wrap.querySelector('img')?.remove()
+    this.wrap.querySelector('.ppv-preview-media')?.remove()
   }
 }

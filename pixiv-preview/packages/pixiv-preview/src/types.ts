@@ -30,6 +30,20 @@ export interface Artwork {
   bookmarkData: BookmarkData | null
 }
 
+/** Pixiv Ugoira 压缩包中的单帧信息。 */
+export interface UgoiraFrame {
+  file: string
+  delay: number
+}
+
+/** Pixiv Ugoira 元数据。 */
+export interface UgoiraMetadata {
+  src: string
+  originalSrc: string
+  mime_type: string
+  frames: UgoiraFrame[]
+}
+
 /** Pixiv AJAX 接口的公共响应结构。 */
 export interface PixivResponse<T> {
   error: boolean

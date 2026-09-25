@@ -43,7 +43,9 @@ export interface LoadProgress {
 
 /** 已加载的预览资源及其释放方法。 */
 export interface RenderedArtwork {
-  image: HTMLImageElement
+  element: HTMLImageElement | HTMLCanvasElement
+  width: number
+  height: number
   dispose(): void
 }
 
@@ -85,7 +87,9 @@ export class StaticArtworkRenderer implements ArtworkRenderer {
     if (cachedImage) {
       onProgress({ loaded: 1, total: 1 })
       return {
-        image: cachedImage,
+        element: cachedImage,
+        width: cachedImage.naturalWidth,
+        height: cachedImage.naturalHeight,
         dispose: () => {
           cachedImage.src = ''
         },
@@ -178,7 +182,9 @@ export class StaticArtworkRenderer implements ArtworkRenderer {
             settled = true
             cleanup()
             resolve({
-              image,
+              element: image,
+              width: image.naturalWidth,
+              height: image.naturalHeight,
               dispose: () => {
                 image.src = ''
                 URL.revokeObjectURL(objectUrl)
@@ -206,5 +212,40 @@ export class StaticArtworkRenderer implements ArtworkRenderer {
   /** 由当前清晰度的第一页地址生成指定页地址。 */
   public getUrl(artwork: Artwork, index: number): string {
     return getImageUrl(artwork, index, this.settings.value.imageQuality)
+  }
+}
+
+/** 根据作品类型把加载任务分派给静态图片或 Ugoira 渲染器。 */
+export class ArtworkRendererDispatcher implements ArtworkRenderer {
+  constructor(
+    private readonly staticRenderer: ArtworkRenderer,
+    private readonly ugoiraRenderer: ArtworkRenderer
+  ) {}
+
+  public load(
+    artwork: Artwork,
+    index: number,
+    signal: AbortSignal,
+    onProgress: (progress: LoadProgress) => void
+  ): Promise<RenderedArtwork> {
+    return this.getRenderer(artwork).load(artwork, index, signal, onProgress)
+  }
+
+  public preload(artwork: Artwork, currentIndex: number): Promise<void> {
+    if (artwork.illustType === 2) return Promise.resolve()
+    return this.staticRenderer.preload(artwork, currentIndex)
+  }
+
+  public cancelPreload(): void {
+    this.staticRenderer.cancelPreload()
+    this.ugoiraRenderer.cancelPreload()
+  }
+
+  public getUrl(artwork: Artwork, index: number): string {
+    return this.getRenderer(artwork).getUrl(artwork, index)
+  }
+
+  private getRenderer(artwork: Artwork): ArtworkRenderer {
+    return artwork.illustType === 2 ? this.ugoiraRenderer : this.staticRenderer
   }
 }

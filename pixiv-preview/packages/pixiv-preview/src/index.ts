@@ -3,10 +3,11 @@ import { BookmarkController } from './bookmark-controller'
 import { BrowserImageCache } from './browser-image-cache'
 import { Notification } from './notification'
 import { PreviewController } from './preview-controller'
-import { StaticArtworkRenderer } from './renderer'
+import { ArtworkRendererDispatcher, StaticArtworkRenderer } from './renderer'
 import { DEFAULT_SETTINGS, SettingsStore } from './settings'
 import { SettingsPanel } from './settings-panel'
 import { injectStyle } from './style'
+import { UgoiraArtworkRenderer } from './ugoira-renderer'
 
 /** 持久化设置使用的油猴存储键。 */
 const SETTINGS_KEY = 'pixivPreviewSettings'
@@ -22,7 +23,11 @@ function bootstrap(): void {
   })
   const bookmarkController = new BookmarkController(api, notification)
   const imageCache = new BrowserImageCache(settings.value.cacheWorks)
-  const renderer = new StaticArtworkRenderer(imageCache, settings)
+  const staticRenderer = new StaticArtworkRenderer(imageCache, settings)
+  const renderer = new ArtworkRendererDispatcher(
+    staticRenderer,
+    new UgoiraArtworkRenderer(api, settings)
+  )
   let previousSettings = settings.value
   settings.subscribe((nextSettings) => {
     imageCache.setMaxWorks(nextSettings.cacheWorks)
