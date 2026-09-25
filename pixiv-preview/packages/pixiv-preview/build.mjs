@@ -3,8 +3,8 @@ import { build } from 'esbuild'
 const metadata = `// ==UserScript==
 // @name         Pixiv Preview
 // @namespace    https://github.com/KagurazakaIris/tampermonkey-scripts
-// @version      0.4.1
-// @description  悬浮预览 Pixiv 作品，并可通过滚轮切图和 B 键收藏
+// @version      0.5.0
+// @description  悬浮预览 Pixiv 作品，并可通过滚轮切图、B 键收藏和 U 键取消收藏
 // @match        https://www.pixiv.net/*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest

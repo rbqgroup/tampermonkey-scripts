@@ -293,7 +293,7 @@ export class PreviewController {
     })
   }
 
-  /** 预览显示时处理关闭与收藏快捷键。 */
+  /** 预览显示时处理关闭、收藏与取消收藏快捷键。 */
   private onKeyDown = (event: KeyboardEvent): void => {
     if (
       !this.artwork ||
@@ -312,7 +312,7 @@ export class PreviewController {
       this.hide()
       return
     }
-    if (event.code !== 'KeyB' || event.repeat) return
+    if ((event.code !== 'KeyB' && event.code !== 'KeyU') || event.repeat) return
 
     event.preventDefault()
     event.stopPropagation()
@@ -320,9 +320,13 @@ export class PreviewController {
     if (activeElement instanceof HTMLElement) activeElement.blur()
     const artwork = this.artwork
     const cardElement = this.activeTarget?.cardElement
-    void this.bookmarkController.add(artwork, cardElement).then((success) => {
+    const operation =
+      event.code === 'KeyB'
+        ? this.bookmarkController.add(artwork, cardElement)
+        : this.bookmarkController.remove(artwork, cardElement)
+    void operation.then(() => {
       const image = this.wrap.querySelector('img')
-      if (success && this.artwork === artwork && image) {
+      if (this.artwork === artwork && image) {
         this.updateInfo(artwork, image)
       }
     })

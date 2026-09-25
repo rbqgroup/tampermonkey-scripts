@@ -21,6 +21,13 @@ export class PixivApi {
     const cached = this.artworkCache.get(id)
     if (cached) return cached
 
+    return this.refreshArtwork(id, signal)
+  }
+
+  /** 绕过缓存获取最新作品数据，并保持已有缓存对象的引用不变。 */
+  public async refreshArtwork(id: string, signal?: AbortSignal): Promise<Artwork> {
+    signal?.throwIfAborted()
+
     const data = await this.request<PixivResponse<Artwork>>(
       `/ajax/illust/${id}?time=${Date.now()}`,
       { signal }
@@ -29,6 +36,11 @@ export class PixivApi {
       throw new PixivApiError(data.message || '获取作品数据失败', 200)
     }
 
+    const cached = this.artworkCache.get(id)
+    if (cached) {
+      Object.assign(cached, data.body)
+      return cached
+    }
     this.artworkCache.set(id, data.body)
     return data.body
   }
@@ -36,6 +48,14 @@ export class PixivApi {
   /** 将作品公开收藏并附带原始标签。 */
   public async addBookmark(artwork: Artwork): Promise<void> {
     await this.sendBookmark(artwork, false)
+  }
+
+  /** 使用收藏记录 ID 取消收藏。 */
+  public async deleteBookmark(
+    artworkId: string,
+    bookmarkId: string
+  ): Promise<void> {
+    await this.sendDeleteBookmark(artworkId, bookmarkId, false)
   }
 
   /** 发送收藏请求；token 失效时只刷新并重试一次。 */
@@ -66,6 +86,39 @@ export class PixivApi {
       ) {
         this.csrfToken = ''
         await this.sendBookmark(artwork, true)
+        return
+      }
+      throw error
+    }
+  }
+
+  /** 发送取消收藏请求；token 失效时只刷新并重试一次。 */
+  private async sendDeleteBookmark(
+    artworkId: string,
+    bookmarkId: string,
+    tokenRefreshed: boolean
+  ): Promise<void> {
+    const token = await this.getCsrfToken(artworkId, tokenRefreshed)
+    try {
+      await this.request<PixivResponse<unknown>>(
+        '/ajax/illusts/bookmarks/delete',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+            'x-csrf-token': token,
+          },
+          body: new URLSearchParams({ bookmark_id: bookmarkId }),
+        }
+      )
+    } catch (error) {
+      if (
+        error instanceof PixivApiError &&
+        error.status === 400 &&
+        !tokenRefreshed
+      ) {
+        this.csrfToken = ''
+        await this.sendDeleteBookmark(artworkId, bookmarkId, true)
         return
       }
       throw error

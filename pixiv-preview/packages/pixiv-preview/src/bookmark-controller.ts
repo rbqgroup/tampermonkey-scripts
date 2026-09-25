@@ -42,18 +42,45 @@ export class BookmarkController {
     }
   }
 
+  /** 查询服务端最新状态后取消收藏，并返回删除请求是否成功。 */
+  public async remove(
+    artwork: Artwork,
+    cardElement?: HTMLElement
+  ): Promise<boolean> {
+    if (this.pending.has(artwork.id)) {
+      this.notification.show('收藏状态请求正在处理中', 'info')
+      return false
+    }
+
+    this.pending.add(artwork.id)
+    this.notification.show('正在检查收藏状态', 'info')
+    try {
+      const latestArtwork = await this.api.refreshArtwork(artwork.id)
+      const bookmarkId = latestArtwork.bookmarkData?.id
+      if (!bookmarkId) {
+        this.notification.show('这个作品尚未收藏', 'info')
+        return false
+      }
+
+      await this.api.deleteBookmark(artwork.id, bookmarkId)
+      latestArtwork.bookmarkData = null
+      latestArtwork.bookmarkCount = Math.max(0, latestArtwork.bookmarkCount - 1)
+      this.syncUnbookmarkIcon(cardElement)
+      this.notification.show('已取消收藏', 'success')
+      return true
+    } catch (error) {
+      this.notification.show(this.getErrorMessage(error, '取消收藏'), 'error')
+      return false
+    } finally {
+      this.pending.delete(artwork.id)
+    }
+  }
+
   /** 将明确识别出的 Pixiv 收藏按钮同步为红心，不触发原生收藏操作。 */
   public syncBookmarkIcon(cardElement?: HTMLElement): void {
     if (!cardElement) return
 
-    const bookmarkButton =
-      cardElement.querySelector<HTMLButtonElement>(
-        'button[data-ga4-label="bookmark_button"]'
-      ) ||
-      cardElement
-        .querySelector<SVGSVGElement>('button svg[width="32"]')
-        ?.closest<HTMLButtonElement>('button')
-    const bookmarkSvg = bookmarkButton?.querySelector<SVGSVGElement>('svg')
+    const bookmarkSvg = this.findBookmarkSvg(cardElement)
     if (bookmarkSvg && getComputedStyle(bookmarkSvg).color !== 'rgb(255, 64, 96)') {
       bookmarkSvg.style.color = 'rgb(255, 64, 96)'
       for (const path of bookmarkSvg.querySelectorAll('path')) {
@@ -67,18 +94,44 @@ export class BookmarkController {
     }
   }
 
+  /** 将明确识别出的 Pixiv 收藏按钮恢复为空心状态。 */
+  private syncUnbookmarkIcon(cardElement?: HTMLElement): void {
+    if (!cardElement) return
+
+    const bookmarkSvg = this.findBookmarkSvg(cardElement)
+    if (bookmarkSvg) {
+      bookmarkSvg.style.color = 'inherit'
+      for (const path of bookmarkSvg.querySelectorAll('path')) {
+        path.style.fill = 'none'
+      }
+    }
+    cardElement.querySelector('._one-click-bookmark')?.classList.remove('on')
+  }
+
+  /** 严格查找新版 Pixiv 缩略图的收藏图标。 */
+  private findBookmarkSvg(cardElement: HTMLElement): SVGSVGElement | undefined {
+    const bookmarkButton =
+      cardElement.querySelector<HTMLButtonElement>(
+        'button[data-ga4-label="bookmark_button"]'
+      ) ||
+      cardElement
+        .querySelector<SVGSVGElement>('button svg[width="32"]')
+        ?.closest<HTMLButtonElement>('button')
+    return bookmarkButton?.querySelector<SVGSVGElement>('svg') || undefined
+  }
+
   /** 将常见 HTTP 状态转换成可操作的错误提示。 */
-  private getErrorMessage(error: unknown): string {
-    if (!(error instanceof PixivApiError)) return '收藏失败，请检查网络连接'
+  private getErrorMessage(error: unknown, action = '收藏'): string {
+    if (!(error instanceof PixivApiError)) return `${action}失败，请检查网络连接`
     switch (error.status) {
       case 401:
-        return '收藏失败，请先登录 Pixiv'
+        return `${action}失败，请先登录 Pixiv`
       case 403:
-        return '收藏失败，账号当前无权执行此操作'
+        return `${action}失败，账号当前无权执行此操作`
       case 429:
-        return '收藏过于频繁，请稍后再试'
+        return `${action}过于频繁，请稍后再试`
       default:
-        return `收藏失败：${error.message}`
+        return `${action}失败：${error.message}`
     }
   }
 }
