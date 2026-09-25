@@ -100,9 +100,16 @@ export class BookmarkController {
 
     const bookmarkSvg = this.findBookmarkSvg(cardElement)
     if (bookmarkSvg) {
-      bookmarkSvg.style.color = 'inherit'
+      bookmarkSvg.style.removeProperty('color')
       for (const path of bookmarkSvg.querySelectorAll('path')) {
-        path.style.fill = 'none'
+        path.style.removeProperty('fill')
+      }
+      const visiblePaths = bookmarkSvg.querySelectorAll<SVGPathElement>(
+        'g[mask] > path'
+      )
+      if (visiblePaths.length > 1) {
+        visiblePaths[visiblePaths.length - 1].style.fill =
+          'rgba(255, 64, 96, 0)'
       }
     }
     cardElement.querySelector('._one-click-bookmark')?.classList.remove('on')
