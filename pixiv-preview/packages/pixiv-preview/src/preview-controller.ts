@@ -114,6 +114,9 @@ export class PreviewController {
       if (!this.isCurrent(target, version)) return
 
       this.artwork = artwork
+      if (artwork.bookmarkData) {
+        this.bookmarkController.syncBookmarkIcon(target.cardElement)
+      }
       this.index = 0
       this.showLoading(target.element, '正在连接图片资源')
       await this.render(version, request.signal)

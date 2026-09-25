@@ -31,7 +31,7 @@ export class BookmarkController {
       await this.api.addBookmark(artwork)
       artwork.bookmarkData = { id: '', private: false }
       artwork.bookmarkCount++
-      this.updateBookmarkIcon(cardElement)
+      this.syncBookmarkIcon(cardElement)
       this.notification.show('已收藏', 'success')
       return true
     } catch (error) {
@@ -42,22 +42,29 @@ export class BookmarkController {
     }
   }
 
-  /** 复刻原扩展的视觉同步，不触发 Pixiv 原生收藏按钮。 */
-  private updateBookmarkIcon(cardElement?: HTMLElement): void {
+  /** 将明确识别出的 Pixiv 收藏按钮同步为红心，不触发原生收藏操作。 */
+  public syncBookmarkIcon(cardElement?: HTMLElement): void {
     if (!cardElement) return
 
-    const allSvg = cardElement.querySelectorAll<SVGSVGElement>('svg')
-    const bookmarkSvg =
-      cardElement.querySelector<SVGSVGElement>('button svg') ||
-      allSvg[allSvg.length - 1]
-    if (bookmarkSvg) {
+    const bookmarkButton =
+      cardElement.querySelector<HTMLButtonElement>(
+        'button[data-ga4-label="bookmark_button"]'
+      ) ||
+      cardElement
+        .querySelector<SVGSVGElement>('button svg[width="32"]')
+        ?.closest<HTMLButtonElement>('button')
+    const bookmarkSvg = bookmarkButton?.querySelector<SVGSVGElement>('svg')
+    if (bookmarkSvg && getComputedStyle(bookmarkSvg).color !== 'rgb(255, 64, 96)') {
       bookmarkSvg.style.color = 'rgb(255, 64, 96)'
       for (const path of bookmarkSvg.querySelectorAll('path')) {
         path.style.fill = 'currentcolor'
       }
     }
 
-    cardElement.querySelector('._one-click-bookmark')?.classList.add('on')
+    const oneClickBookmark = cardElement.querySelector('._one-click-bookmark')
+    if (!oneClickBookmark?.classList.contains('on')) {
+      oneClickBookmark?.classList.add('on')
+    }
   }
 
   /** 将常见 HTTP 状态转换成可操作的错误提示。 */
