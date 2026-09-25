@@ -1,15 +1,4 @@
 import { build } from 'esbuild'
-import { readFile } from 'node:fs/promises'
-
-const thirdPartyLicenses = await readFile(
-  new URL('../../THIRD_PARTY_LICENSES.txt', import.meta.url),
-  'utf8'
-)
-const thirdPartyLicenseComments = thirdPartyLicenses
-  .trimEnd()
-  .split('\n')
-  .map((line) => (line ? `// ${line}` : '//'))
-  .join('\n')
 
 const metadata = `// ==UserScript==
 // @name         Pixiv Preview
@@ -24,6 +13,7 @@ const metadata = `// ==UserScript==
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @connect      i.pximg.net
+// @require      https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.18.2/dist/zip-native.min.js
 // ==/UserScript==`
 
 await build({
@@ -35,5 +25,5 @@ await build({
   minify: false,
   sourcemap: false,
   legalComments: 'inline',
-  banner: { js: `${metadata}\n\n${thirdPartyLicenseComments}` },
+  banner: { js: metadata },
 })

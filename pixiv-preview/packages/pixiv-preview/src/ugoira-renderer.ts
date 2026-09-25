@@ -1,9 +1,4 @@
-import {
-  BlobReader,
-  BlobWriter,
-  ZipReader,
-  type FileEntry,
-} from '@zip.js/zip.js/lib/zip-core-native.js'
+import type * as ZipModule from '@zip.js/zip.js/lib/zip-core-native.js'
 
 import { PixivApi } from './api'
 import type {
@@ -14,6 +9,11 @@ import type {
 import { SettingsStore } from './settings'
 import type { Artwork, UgoiraMetadata } from './types'
 import { UgoiraPlayer, calculateDecodeSize } from './ugoira-player'
+
+const { BlobReader, BlobWriter, ZipReader } = (
+  globalThis as typeof globalThis & { zip: typeof ZipModule }
+).zip
+type FileEntry = ZipModule.FileEntry
 
 const MAX_ARCHIVE_BYTES = 96 * 1024 * 1024
 const MAX_FRAME_BYTES = 32 * 1024 * 1024
