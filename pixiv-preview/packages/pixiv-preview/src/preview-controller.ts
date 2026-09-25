@@ -64,7 +64,7 @@ export class PreviewController {
   private bindEvents(): void {
     document.addEventListener('pointerover', this.onPointerOver, true)
     document.addEventListener('pointerout', this.onPointerOut, true)
-    document.addEventListener('wheel', this.onWheel, {
+    window.addEventListener('wheel', this.onWheel, {
       capture: true,
       passive: false,
     })
