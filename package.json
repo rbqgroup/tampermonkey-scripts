@@ -3,10 +3,11 @@
   "private": true,
   "license": "MIT",
   "workspaces": [
-    "pixiv-preview"
+    "pixiv-preview",
+    "twitter-minimal"
   ],
   "scripts": {
-    "build": "npm run build --workspace=pixiv-preview",
-    "typecheck": "npm run typecheck --workspace=pixiv-preview"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }
