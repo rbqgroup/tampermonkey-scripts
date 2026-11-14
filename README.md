@@ -14,7 +14,8 @@
 ├── twitter-minimal/         X 界面精简与行为优化脚本
 │   ├── src/                 原生 JavaScript 用户脚本
 │   ├── dist/                可直接安装的用户脚本
-│   └── build.mjs            原样复制源码，保留元数据与页面上下文
+│   ├── build.mjs            原样复制源码，保留元数据与页面上下文
+│   └── README.md            安装、功能与限制说明
 ├── .github/workflows/       GitHub Actions 工作流
 ├── package.json             workspaces 根配置
 └── tsconfig.json            共享 TypeScript 配置
