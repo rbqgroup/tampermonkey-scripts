@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 界面精简
 // @namespace    https://github.com/rbqgroup/tampermonkey-scripts
-// @version      0.4.1
+// @version      0.4.2
 // @description  精简 X 界面、净化分享链接、快捷关注、展示 Pixiv 资料链接，并保守省流。
 // @license      MIT
 // @homepageURL  https://github.com/rbqgroup/tampermonkey-scripts/tree/main/twitter-minimal
@@ -23,7 +23,7 @@
 
   // 在页面上下文运行，才能覆盖网站实际使用的剪贴板及网络方法。
   if (window.__twitterMinimal) return;
-  const runtime = { version: '0.4.1', blockedRequests: 0 };
+  const runtime = { version: '0.4.2', blockedRequests: 0 };
   window.__twitterMinimal = runtime;
   const articleSelector = 'article[data-testid="tweet"]';
   const hoverCardSelector = '[data-testid="HoverCard"]';
