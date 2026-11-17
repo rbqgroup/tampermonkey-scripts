@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X 界面精简
 // @namespace    https://github.com/rbqgroup/tampermonkey-scripts
-// @version      0.4.0
+// @version      0.4.1
 // @description  精简 X 界面、净化分享链接、快捷关注、展示 Pixiv 资料链接，并保守省流。
 // @license      MIT
 // @homepageURL  https://github.com/rbqgroup/tampermonkey-scripts/tree/main/twitter-minimal
@@ -23,7 +23,7 @@
 
   // 在页面上下文运行，才能覆盖网站实际使用的剪贴板及网络方法。
   if (window.__twitterMinimal) return;
-  const runtime = { version: '0.4.0', blockedRequests: 0 };
+  const runtime = { version: '0.4.1', blockedRequests: 0 };
   window.__twitterMinimal = runtime;
   const articleSelector = 'article[data-testid="tweet"]';
   const hoverCardSelector = '[data-testid="HoverCard"]';
@@ -537,8 +537,42 @@
     }
   }
 
+  // 查看数据改为只读，并移到时间行末尾；操作栏中的等宽格子留给收藏。
+  function updateViewStats(article) {
+    const links = article.querySelectorAll('a[href*="/analytics"]');
+    for (const link of links) {
+      if (link.tabIndex !== -1) link.tabIndex = -1;
+      if (link.getAttribute('aria-disabled') !== 'true') {
+        link.setAttribute('aria-disabled', 'true');
+      }
+    }
+    const source = [...links].find(link => link.closest('[role="group"]'));
+    // 时间行已经显示查看数时（例如宽屏详情页）不再复制一份。
+    const inline = [...links].find(link => !link.closest('[role="group"]'));
+    const time = source && article.querySelector('[data-testid="User-Name"] time');
+    const line = time?.closest('a')?.parentElement;
+    const existing = article.querySelector('.x-minimal-views');
+    if (!source || inline || !line) {
+      existing?.remove();
+      return;
+    }
+    // 原生无障碍名称形如“733 次查看。查看帖子分析”，仅保留数量描述。
+    let label = (source.getAttribute('aria-label') || '').split(/。|\.\s/)[0].trim()
+      || source.textContent.trim();
+    if (/^[\d.,]+$/.test(label)) label += ' 查看';
+    const text = `· ${label || '查看'}`;
+    let item = existing;
+    if (!item) {
+      item = document.createElement('span');
+      item.className = 'x-minimal-views';
+    }
+    if (item.previousElementSibling !== line) line.after(item);
+    if (item.textContent !== text) item.textContent = text;
+  }
+
   function updateArticle(article) {
     if (!article.isConnected) return;
+    updateViewStats(article);
     const name = article.querySelector('[data-testid="User-Name"]');
     const link = name?.querySelector('a[href]');
     const path = link?.getAttribute('href') || '';
@@ -853,6 +887,77 @@
         min-width: 0 !important;
         box-sizing: border-box !important;
       }
+    }
+
+    /* 回复、转帖、喜欢、收藏的可点击范围撑满各自格子；分享保持原生范围。 */
+    article[data-testid="tweet"]
+    [role="group"]:has([data-testid="reply"]) > div > :is(
+      [data-testid="reply"],
+      [data-testid="retweet"],
+      [data-testid="unretweet"],
+      [data-testid="like"],
+      [data-testid="unlike"],
+      [data-testid="bookmark"],
+      [data-testid="removeBookmark"]
+    ) {
+      width: 100% !important;
+      height: 100% !important;
+      box-sizing: border-box !important;
+      border-radius: 4px;
+    }
+
+    /* 用背景色标示各动作的实际触发范围：回复、转帖、喜欢、收藏、分享。 */
+    article[data-testid="tweet"] [role="group"] [data-testid="reply"] {
+      background: rgba(29, 155, 240, 0.28) !important;
+    }
+
+    article[data-testid="tweet"] [role="group"] :is(
+      [data-testid="retweet"], [data-testid="unretweet"]
+    ) {
+      background: rgba(0, 186, 124, 0.28) !important;
+    }
+
+    article[data-testid="tweet"] [role="group"] :is(
+      [data-testid="like"], [data-testid="unlike"]
+    ) {
+      background: rgba(249, 24, 128, 0.28) !important;
+    }
+
+    article[data-testid="tweet"] [role="group"] :is(
+      [data-testid="bookmark"], [data-testid="removeBookmark"]
+    ) {
+      background: rgba(255, 160, 0, 0.30) !important;
+    }
+
+    article[data-testid="tweet"]
+    [role="group"]:has([data-testid="reply"]) > div:last-child button:not([data-testid]) {
+      background: rgba(120, 86, 255, 0.22) !important;
+      border-radius: 4px;
+    }
+
+    /* 操作栏中的查看数据按钮只保留占位语义，实际显示位置改到时间行。 */
+    article[data-testid="tweet"]
+    [role="group"]:has([data-testid="reply"]) > div:has(a[href*="/analytics"]) {
+      display: none !important;
+    }
+
+    /* 收藏沿用查看数据原来的等宽格子，触发区域与其他动作一致。 */
+    article[data-testid="tweet"]
+    [role="group"]:has([data-testid="reply"]) > div:has(> [data-testid="bookmark"]) {
+      flex: 1 1 0% !important;
+    }
+
+    /* 查看数据只读：取消链接的点击与键盘访问。 */
+    article[data-testid="tweet"] a[href*="/analytics"] {
+      pointer-events: none !important;
+      cursor: default !important;
+      text-decoration: none !important;
+    }
+
+    .x-minimal-views {
+      margin-left: 4px;
+      line-height: inherit;
+      white-space: nowrap;
     }
 
     /* 中等屏幕：只保留导航图标，文字隐藏但无障碍名称仍然保留。 */
