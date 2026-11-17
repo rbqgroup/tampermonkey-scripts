@@ -943,7 +943,9 @@
 
     /* 收藏沿用查看数据原来的等宽格子，触发区域与其他动作一致。 */
     article[data-testid="tweet"]
-    [role="group"]:has([data-testid="reply"]) > div:has(> [data-testid="bookmark"]) {
+    [role="group"]:has([data-testid="reply"]) > div:has(> :is(
+      [data-testid="bookmark"], [data-testid="removeBookmark"]
+    )) {
       flex: 1 1 0% !important;
     }
 
